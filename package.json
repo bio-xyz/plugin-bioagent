@@ -1,0 +1,85 @@
+{
+  "name": "@elizaos/plugin-bioagent",
+  "description": "Plugin for BioAgent",
+  "version": "1.0.0-beta.20",
+  "type": "module",
+  "main": "dist/index.js",
+  "module": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "repository": {
+    "type": "git",
+    "url": "github:elizaos-plugins/plugin-bioagent"
+  },
+  "exports": {
+    "./package.json": "./package.json",
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      }
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.39.0",
+    "@elizaos/cli": "1.0.0-beta.21",
+    "@elizaos/core": "1.0.0-beta.21",
+    "@instructor-ai/instructor": "^1.7.0",
+    "axios": "^1.8.4",
+    "cheerio": "^1.0.0",
+    "cli-progress": "^3.12.0",
+    "dkg.js": "^8.0.8",
+    "dotenv": "^16.4.7",
+    "drizzle-orm": "^0.41.0",
+    "form-data": "^4.0.2",
+    "googleapis": "^148.0.0",
+    "jsonld-streaming-parser": "^5.0.0",
+    "n3": "^1.24.2",
+    "openai": "^4.91.1",
+    "pdf2pic": "^3.1.4",
+    "pg": "^8.14.1",
+    "punycode": "^2.3.1",
+    "ts-node": "^10.9.2",
+    "tsconfig-paths": "^4.2.0",
+    "zod": "3.24.2"
+  },
+  "devDependencies": {
+    "@types/cli-progress": "^3.11.6",
+    "@types/n3": "^1.24.2",
+    "@types/node": "^22.14.0",
+    "@types/pg": "^8.11.11",
+    "drizzle-kit": "^0.30.6",
+    "prettier": "3.5.3",
+    "tsup": "8.4.0"
+  },
+  "scripts": {
+    "start": "npx @elizaos/cli start",
+    "test-with-cli": "cd ../cli && bun run build && cd ../plugin-starter && elizaos test",
+    "dev": "npx @elizaos/cli dev",
+    "build": "tsup",
+    "lint": "prettier --write ./src",
+    "test": "npx @elizaos/cli test",
+    "publish": "npx @elizaos/cli plugin publish",
+    "format": "prettier --write ./src",
+    "format:check": "prettier --check ./src"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "resolutions": {
+    "zod": "3.24.2"
+  },
+  "gitHead": "b165ad83e5f7a21bc1edbd83374ca087e3cd6b33",
+  "platform": "universal",
+  "agentConfig": {
+    "pluginType": "elizaos:plugin:1.0.0",
+    "pluginParameters": {
+      "API_KEY": {
+        "type": "string",
+        "description": "API key for the service"
+      }
+    }
+  }
+}
