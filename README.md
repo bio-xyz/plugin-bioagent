@@ -1,10 +1,10 @@
 # BioAgent Plugin 🤖🧬
 
-An Eliza plugin that transforms scientific papers into structured Knowledge Assets (KAs). These Knowledge Assets can then be integrated into an RDF triple store, such as [OriginTrail's DKG](https://origintrail.io/technology/decentralized-knowledge-graph) or [Oxigraph](https://github.com/oxigraph/oxigraph).
+An Eliza plugin that transforms scientific papers into structured Knowledge Assets (KAs). These Knowledge Assets can then be integrated into an RDF triple store, such as [OriginTrail's DKG](https://origintrail.io/technology/decentralized-knowledge-graph) or [Oxigraph](https://github.com/oxigraph/oxigraph). 📄🔍🌐
 
 ## 🚀 How It Works
 
-The BioAgent Plugin continuously monitors a designated Google Drive folder for newly added scientific documents. Once detected, these documents are automatically converted into structured Knowledge Assets and incorporated into a dynamic knowledge graph. An intelligent agent navigates this graph, systematically generating novel hypotheses. These hypotheses are subsequently evaluated and scored by the integrated JudgeLLM, using a rigorous and predefined rubric to ensure accuracy and relevance. By default, hypothesis generation and evaluation occur every 90 seconds, though the interval can be customized.
+The BioAgent Plugin continuously monitors a designated Google Drive folder for newly added scientific documents. Once detected, these documents are automatically converted into structured Knowledge Assets and incorporated into a dynamic knowledge graph. An intelligent agent navigates this graph, systematically generating novel hypotheses. These hypotheses are subsequently evaluated and scored by the integrated JudgeLLM, using a rigorous and predefined rubric to ensure accuracy and relevance. By default, hypothesis generation and evaluation occur every 90 seconds, though the interval can be customized. 🔄🤖✨
 
 ## 🛠 Getting Started
 
@@ -84,4 +84,4 @@ BIONTOLOGY_KEY=your_biontology_api_key
 4. Enter the service account email (found in the downloaded JSON file) into the share field.
 5. Set permissions ("Editor" or "Viewer") accordingly, then click **Send**.
 
-Your Google Cloud service account now has access to your specified folder.
+Your Google Cloud service account now has access to your specified folder. 📁🔑✅
