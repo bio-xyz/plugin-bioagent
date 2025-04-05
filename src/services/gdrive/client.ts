@@ -29,5 +29,5 @@ export async function initDriveClient(
 }
 
 export const FOLDERS = {
-  MAIN_FOLDER: "1Ta7TJ6nq5hTbih-3P_Ck9-BeTgBKpCsg",
+  MAIN_FOLDER: process.env.GOOGLE_DRIVE_FOLDER_ID,
 };
