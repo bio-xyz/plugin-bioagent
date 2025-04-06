@@ -1,5 +1,5 @@
 import { IAgentRuntime, logger } from "@elizaos/core";
-import { initDriveClient, FOLDERS } from "./client.js";
+import { initDriveClient, FOLDERS, getListFilesQuery } from "./client.js";
 import { drive_v3 } from "googleapis";
 import { fileURLToPath } from "url";
 import { dirname } from "path";
@@ -7,8 +7,10 @@ import DKG from "dkg.js";
 import { fromBuffer } from "pdf2pic";
 import { pdf2PicOptions } from "./index.js";
 import { OpenAIImage } from "./extract/types.js";
-import { generateKa } from "./extract/index.js";
+import { generateKa } from "./extract";
 import { storeJsonLd } from "./storeJsonLdToKg.js";
+import { db, fileMetadataTable } from "src/db";
+
 type Schema$File = drive_v3.Schema$File;
 
 const __filename = fileURLToPath(import.meta.url);
@@ -50,11 +52,8 @@ async function downloadFile(
 
 async function getFilesInfo(): Promise<FileInfo[]> {
   const drive = await initDriveClient();
-  const response = await drive.files.list({
-    q: `'${FOLDERS.MAIN_FOLDER}' in parents and mimeType='application/pdf' and trashed=false`,
-    fields: "files(id, name, md5Checksum, size)", // https://developers.google.com/workspace/drive/api/reference/rest/v3/files#File
-    orderBy: "name",
-  });
+  const query = getListFilesQuery();
+  const response = await drive.files.list(query);
 
   return (response.data.files || [])
     .filter(
@@ -96,7 +95,14 @@ export async function watchFolderChanges(runtime: IAgentRuntime) {
     nodeApiVersion: "/v1",
   });
   let knownHashes = new Set<string>();
-  let processedFiles = new Set<string>(); // Track files we've already processed
+  let processedFilesId = new Set<string>();
+  let response = await db
+    .select({ hash: fileMetadataTable.hash, id: fileMetadataTable.id })
+    .from(fileMetadataTable);
+  for (const file of response) {
+    knownHashes.add(file.hash);
+    processedFilesId.add(file.id);
+  }
   const drive = await initDriveClient();
   let intervalId: NodeJS.Timeout | null = null;
   let isRunning = true;
@@ -106,11 +112,12 @@ export async function watchFolderChanges(runtime: IAgentRuntime) {
 
     try {
       const files = await getFilesInfo();
+      logger.info(`Found ${files.length} files`);
       const currentHashes = new Set(files.map((f) => f.md5Checksum));
 
       // Check for new files by hash that we haven't processed yet
       const newFiles = files.filter(
-        (f) => !knownHashes.has(f.md5Checksum) && !processedFiles.has(f.id)
+        (f) => !knownHashes.has(f.md5Checksum) && !processedFilesId.has(f.id)
       );
 
       if (newFiles.length > 0) {
@@ -126,7 +133,7 @@ export async function watchFolderChanges(runtime: IAgentRuntime) {
           logger.info(`Successfully downloaded ${file.name}`);
 
           // Mark as processed immediately after download
-          processedFiles.add(file.id);
+          processedFilesId.add(file.id);
 
           const converter = fromBuffer(pdfBuffer, pdf2PicOptions);
           const storeHandler = await converter.bulk(-1, {

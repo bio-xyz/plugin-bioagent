@@ -11,23 +11,6 @@ export class HypothesisService extends Service {
     super(runtime);
   }
   static async start(runtime: IAgentRuntime) {
-    setTimeout(async () => {
-      {
-        const { rows } = await runtime.db.execute(sql`SELECT * FROM tasks;`);
-        logger.info("Database", rows);
-      }
-      {
-        const result = await runtime.db.select().from(fileMetadataTable);
-        logger.info("File Metadata", result);
-      }
-      {
-        const { rows, fields } = await runtime.db.execute(
-          sql`SELECT * FROM biograph.file_metadata;`
-        );
-        logger.info("File Metadata", rows);
-        logger.info("Fields", fields);
-      }
-    }, 30000);
     logger.info("*** Starting hypotheses service ***");
     const service = new HypothesisService(runtime);
     // const interval = await hypGenEvalLoop(runtime);

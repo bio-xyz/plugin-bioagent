@@ -1,7 +1,9 @@
 import { drizzle } from "drizzle-orm/node-postgres";
-import { Pool } from "pg";
+import pkg from "pg";
 import "dotenv/config";
-import { hypothesesTable } from "./schemas/hypotheses";
+import { hypothesesTable, fileMetadataTable, driveSyncTable } from "./schemas";
+
+const { Pool } = pkg;
 const pool = new Pool({
   connectionString: process.env.POSTGRES_URL,
 });
@@ -9,6 +11,8 @@ const pool = new Pool({
 export const db = drizzle(pool, {
   schema: {
     hypotheses: hypothesesTable,
+    fileMetadata: fileMetadataTable,
+    driveSync: driveSyncTable,
   },
 });
 

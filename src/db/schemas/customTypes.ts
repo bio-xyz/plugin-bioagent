@@ -5,3 +5,8 @@ export const hypothesisStatusEnum = pgEnum("hypothesis_status", [
   "approved",
   "rejected",
 ]);
+
+export const driveTypeEnum = pgEnum("drive_type", [
+  "shared_folder",
+  "shared_drive",
+]);
