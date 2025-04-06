@@ -76,9 +76,45 @@
   "agentConfig": {
     "pluginType": "elizaos:plugin:1.0.0",
     "pluginParameters": {
-      "API_KEY": {
+      "POSTGRES_URL": {
         "type": "string",
-        "description": "API key for the service"
+        "description": "PostgreSQL connection URL"
+      },
+      "OPENAI_API_KEY": {
+        "type": "string",
+        "description": "OpenAI API key"
+      },
+      "ANTHROPIC_API_KEY": {
+        "type": "string",
+        "description": "Anthropic API key"
+      },
+      "GCP_JSON_CREDENTIALS": {
+        "type": "string",
+        "description": "Google Cloud Platform service account JSON credentials"
+      },
+      "GOOGLE_DRIVE_FOLDER_ID": {
+        "type": "string",
+        "description": "Google Drive folder ID for scientific papers"
+      },
+      "DISCORD_APPLICATION_ID": {
+        "type": "string",
+        "description": "Discord application ID"
+      },
+      "DISCORD_API_TOKEN": {
+        "type": "string",
+        "description": "Discord bot token"
+      },
+      "DISCORD_VOICE_CHANNEL_ID": {
+        "type": "string",
+        "description": "Discord voice channel ID"
+      },
+      "DISCORD_CHANNEL_ID": {
+        "type": "string",
+        "description": "Discord text channel ID"
+      },
+      "BIONTOLOGY_KEY": {
+        "type": "string",
+        "description": "BioOntology API key"
       }
     }
   }
