@@ -1,18 +1,18 @@
 # BioAgent Plugin 🤖🧬
 
-An Eliza plugin that transforms scientific papers into structured Knowledge Assets (KAs). These Knowledge Assets can then be integrated into an RDF triple store, such as [OriginTrail's DKG](https://origintrail.io/technology/decentralized-knowledge-graph) or [Oxigraph](https://github.com/oxigraph/oxigraph). 📄🔍🌐
+An Eliza plugin tailored for researchers and bioscientists, converting scientific papers into structured Knowledge Assets (KAs). These Knowledge Assets integrate seamlessly into RDF triple stores such as [OriginTrail's DKG](https://origintrail.io/technology/decentralized-knowledge-graph) or [Oxigraph](https://github.com/oxigraph/oxigraph), enhancing data management and advancing biological research capabilities. 📄🔍🌐
 
 ## 🚀 How It Works
 
-The BioAgent Plugin continuously monitors a designated Google Drive folder for newly added scientific documents. Once detected, these documents are automatically converted into structured Knowledge Assets and incorporated into a dynamic knowledge graph. An intelligent agent navigates this graph, systematically generating novel hypotheses. These hypotheses are subsequently evaluated and scored by the integrated JudgeLLM, using a rigorous and predefined rubric to ensure accuracy and relevance. By default, hypothesis generation and evaluation occur every 90 seconds, though the interval can be customized. 🔄🤖✨
+The BioAgent Plugin continuously monitors a specified Google Drive folder for new scientific documents. Upon detection, it automatically transforms these papers into structured Knowledge Assets and incorporates them into a dynamic knowledge graph. An intelligent agent explores this graph to systematically generate novel biological hypotheses across multiple domains, including genetics, molecular biology, and biotechnology. These hypotheses are then rigorously evaluated and scored by the integrated JudgeLLM according to a precise rubric, ensuring their accuracy and relevance. By default, this cycle of hypothesis generation and evaluation occurs every 90 seconds, but the frequency can be customized. 🔄🤖✨
 
 ## 🛠 Getting Started
 
-Follow these steps to set up and run the BioAgent Plugin:
+Follow these steps to install and launch the BioAgent Plugin:
 
 ### 1. Install System Dependencies
 
-Ensure you have the following dependencies installed on your system:
+Ensure the following dependencies are installed on your system:
 
 ```bash
 # For Ubuntu/Debian
@@ -32,13 +32,15 @@ cd plugin-bioagent
 pnpm install
 ```
 
-### 4. Start the Development Server
+### 4. Launch the Development Server
 
 ```bash
 pnpm run dev
 ```
 
-## 🔧 Setup Environment Variables
+This command starts the development server at `http://localhost:3000`. Allow around 90 seconds for initial setup, after which the BioAgent Plugin will begin generating and evaluating hypotheses.
+
+## 🔧 Configure Environment Variables
 
 Copy and rename the example environment file:
 
@@ -46,7 +48,7 @@ Copy and rename the example environment file:
 mv .env.example .env
 ```
 
-### Required Environment Variables
+### Essential Environment Variables
 
 Update your `.env` file with the following variables:
 
@@ -60,28 +62,28 @@ DISCORD_APPLICATION_ID=your_discord_app_id
 DISCORD_API_TOKEN=your_discord_bot_token
 DISCORD_VOICE_CHANNEL_ID=your_voice_channel_id  # Optional
 DISCORD_CHANNEL_ID=your_text_channel_id
-BIONTOLOGY_KEY=your_biontology_api_key
+BIONTOLOGY_KEY=your_biontology_api_key  # Obtain at https://bioportal.bioontology.org/accounts/new
 ```
 
-## 📋 Obtaining Google Cloud Service Account JSON and Setting Permissions
+## 📋 Obtaining Google Cloud Service Account JSON & Setting Permissions
 
-### Creating Your Service Account
+### Creating a Service Account
 
-1. **Go to the [Google Cloud Console](https://console.cloud.google.com/).**
-2. Select or create your project.
+1. Visit the [Google Cloud Console](https://console.cloud.google.com/).
+2. Select or create your desired project.
 3. Navigate to **APIs & Services** > **Credentials**.
 4. Click **+ CREATE CREDENTIALS**, then select **Service Account**.
-5. Provide a descriptive name for your service account, then click **Create**.
-6. Assign necessary roles (e.g., Editor), and click **Continue**.
-7. Open your newly created service account and navigate to the **Keys** tab.
-8. Select **Add Key** > **Create new key**, choose **JSON**, then click **Create**. The JSON file will automatically download.
+5. Provide a descriptive name for the service account and click **Create**.
+6. Assign necessary roles (e.g., Editor) and click **Continue**.
+7. Open the newly created service account, go to the **Keys** tab.
+8. Click **Add Key** > **Create new key**, choose **JSON**, and click **Create**. The JSON file will automatically download.
 
 ### Granting Access to Google Drive Folder
 
 1. Open your [Google Drive](https://drive.google.com/).
-2. Navigate to the folder corresponding to the `GOOGLE_DRIVE_FOLDER_ID`.
-3. Right-click on the folder and select **Share**.
-4. Enter the service account email (found in the downloaded JSON file) into the share field.
-5. Set permissions ("Editor" or "Viewer") accordingly, then click **Send**.
+2. Navigate to the folder associated with the `GOOGLE_DRIVE_FOLDER_ID`.
+3. Right-click the folder and select **Share**.
+4. Enter the service account email (available in your downloaded JSON file) into the sharing field.
+5. Set permissions ("Editor" or "Viewer") accordingly and click **Send**.
 
-Your Google Cloud service account now has access to your specified folder. 📁🔑✅
+Your Google Cloud service account now has access to the specified folder. 📁🔑✅
