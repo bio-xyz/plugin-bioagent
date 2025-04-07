@@ -1,5 +1,5 @@
 {
-  "name": "@elizaos/plugin-bioagent",
+  "name": "@bio-xyz/plugin-bioagent",
   "description": "Plugin for BioAgent",
   "version": "1.0.0-beta.20",
   "type": "module",
@@ -8,7 +8,7 @@
   "types": "dist/index.d.ts",
   "repository": {
     "type": "git",
-    "url": "github:elizaos-plugins/plugin-bioagent"
+    "url": "github:bio-xyz/plugin-bioagent"
   },
   "exports": {
     "./package.json": "./package.json",
