@@ -5,7 +5,7 @@ var __export = (target, all) => {
 };
 
 // src/index.ts
-import { logger as logger15 } from "@elizaos/core";
+import { logger as logger16 } from "@elizaos/core";
 
 // src/actions/dkgInsert.ts
 import dotenv from "dotenv";
@@ -1986,7 +1986,7 @@ var HypothesisService = class _HypothesisService extends Service {
 };
 
 // src/helper.ts
-import { logger as logger11 } from "@elizaos/core";
+import { logger as logger12 } from "@elizaos/core";
 
 // src/db/index.ts
 import { drizzle } from "drizzle-orm/node-postgres";
@@ -2428,11 +2428,65 @@ var __dirname3 = dirname(__filename);
 
 // src/helper.ts
 import "dotenv/config";
+
+// src/db/migration.ts
+import { drizzle as drizzle2 } from "drizzle-orm/node-postgres";
+import { migrate } from "drizzle-orm/node-postgres/migrator";
+import pkg2 from "pg";
+import "dotenv/config";
+import { existsSync, writeFileSync } from "fs";
+import path3 from "path";
+import { logger as logger11 } from "@elizaos/core";
+var { Pool: Pool2 } = pkg2;
+var getMigrationFlag = () => {
+  const flagPath = path3.join(process.cwd(), ".migration-complete");
+  return existsSync(flagPath);
+};
+var setMigrationFlag = () => {
+  const flagPath = path3.join(process.cwd(), ".migration-complete");
+  writeFileSync(flagPath, (/* @__PURE__ */ new Date()).toISOString());
+};
+var migrateDb = async () => {
+  if (getMigrationFlag()) {
+    logger11.info("Migrations already applied, skipping...");
+    return;
+  }
+  if (!process.env.POSTGRES_URL) {
+    logger11.warn(
+      "POSTGRES_URL environment variable is not set, skipping migrations"
+    );
+    return;
+  }
+  try {
+    logger11.info("Running database migrations...");
+    const pool2 = new Pool2({
+      connectionString: process.env.POSTGRES_URL
+    });
+    const db2 = drizzle2(pool2);
+    await migrate(db2, { migrationsFolder: "drizzle" });
+    setMigrationFlag();
+    logger11.info("Migrations completed successfully");
+    await pool2.end();
+  } catch (error) {
+    logger11.error("Error running migrations:", error);
+    throw error;
+  }
+};
+
+// src/helper.ts
+async function initWithMigrations(runtime) {
+  try {
+    await migrateDb();
+    await initDriveSync(runtime);
+  } catch (error) {
+    logger12.error("Error during initialization:", error);
+  }
+}
 async function initDriveSync(runtime) {
   const driveSync = await runtime.db.select().from(driveSyncTable);
   if (driveSync.length === 0) {
-    logger11.info("Initializing drive sync");
-    logger11.info("No drive sync found, creating new one");
+    logger12.info("Initializing drive sync");
+    logger12.info("No drive sync found, creating new one");
     const driveClient = await initDriveClient();
     const listFilesQueryContext = new ListFilesQueryContext(
       process.env.GOOGLE_DRIVE_FOLDER_ID,
@@ -2449,20 +2503,20 @@ async function initDriveSync(runtime) {
       driveType
     });
   } else {
-    logger11.info("Drive sync already initialized");
+    logger12.info("Drive sync already initialized");
   }
 }
 
 // src/routes/gdrive/webhook.ts
-import { logger as logger13 } from "@elizaos/core";
+import { logger as logger14 } from "@elizaos/core";
 
 // src/routes/controller.ts
 import { eq } from "drizzle-orm";
-import { logger as logger12 } from "@elizaos/core";
+import { logger as logger13 } from "@elizaos/core";
 async function syncGoogleDriveChanges(runtime) {
   const driveSync = await runtime.db.select().from(driveSyncTable);
   if (driveSync.length === 0) {
-    logger12.error("No drive sync found, cannot process changes");
+    logger13.error("No drive sync found, cannot process changes");
     throw new Error("Drive sync not initialized");
   }
   const syncRecord = driveSync[0];
@@ -2488,25 +2542,25 @@ async function syncGoogleDriveChanges(runtime) {
     params.q = `'${driveId}' in parents`;
   }
   const changesResponse = await drive.changes.list(params);
-  logger12.info(`Found ${changesResponse.data.changes?.length || 0} changes`);
+  logger13.info(`Found ${changesResponse.data.changes?.length || 0} changes`);
   let processedCount = 0;
   if (changesResponse.data.changes && changesResponse.data.changes.length > 0) {
     for (const change of changesResponse.data.changes) {
       if (!change.fileId) continue;
       processedCount++;
       if (change.removed) {
-        logger12.info(
+        logger13.info(
           `File ${change.fileId} removed from trash - no action needed`
         );
       } else if (change.file?.trashed) {
-        logger12.info(
+        logger13.info(
           `File ${change.fileId} moved to trash - removing from database`
         );
         await runtime.db.delete(fileMetadataTable).where(eq(fileMetadataTable.id, change.fileId));
       } else if (change.file && !change.file.trashed) {
         const file = change.file;
         if (file.mimeType === "application/pdf") {
-          logger12.info(`Processing PDF file: ${file.name}`);
+          logger13.info(`Processing PDF file: ${file.name}`);
           await runtime.db.insert(fileMetadataTable).values({
             id: file.id,
             hash: file.md5Checksum,
@@ -2522,11 +2576,11 @@ async function syncGoogleDriveChanges(runtime) {
               id: file.id
             }
           });
-          logger12.info(
+          logger13.info(
             `Saved/updated file metadata for ${file.name} (${file.id})`
           );
         } else {
-          logger12.info(`Skipping non-PDF file: ${file.name} (${file.mimeType})`);
+          logger13.info(`Skipping non-PDF file: ${file.name} (${file.mimeType})`);
         }
       }
     }
@@ -2536,7 +2590,7 @@ async function syncGoogleDriveChanges(runtime) {
       startPageToken: changesResponse.data.newStartPageToken,
       lastSyncAt: /* @__PURE__ */ new Date()
     }).where(eq(driveSyncTable.id, driveId));
-    logger12.info(
+    logger13.info(
       `Updated start page token to: ${changesResponse.data.newStartPageToken}`
     );
   }
@@ -2552,14 +2606,14 @@ var gdriveWebhook = {
   type: "POST",
   handler: async (_req, res, runtime) => {
     try {
-      logger13.info("Google Drive webhook triggered");
+      logger14.info("Google Drive webhook triggered");
       const result = await syncGoogleDriveChanges(runtime);
       res.json({
         message: "OK",
         ...result
       });
     } catch (error) {
-      logger13.error("Error processing Google Drive webhook:", error);
+      logger14.error("Error processing Google Drive webhook:", error);
       res.status(500).json({
         message: "Error processing webhook",
         error: error.message
@@ -2569,13 +2623,13 @@ var gdriveWebhook = {
 };
 
 // src/routes/gdrive/manualSync.ts
-import { logger as logger14 } from "@elizaos/core";
+import { logger as logger15 } from "@elizaos/core";
 var gdriveManualSync = {
   path: "/gdrive/sync",
   type: "GET",
   handler: async (_req, res, runtime) => {
     try {
-      logger14.info("Manual Google Drive sync triggered");
+      logger15.info("Manual Google Drive sync triggered");
       const result = await syncGoogleDriveChanges(runtime);
       while (result.changes > 0) {
         await syncGoogleDriveChanges(runtime);
@@ -2585,7 +2639,7 @@ var gdriveManualSync = {
         ...result
       });
     } catch (error) {
-      logger14.error("Error during manual Google Drive sync:", error);
+      logger15.error("Error during manual Google Drive sync:", error);
       res.status(500).json({
         message: "Error during sync",
         error: error.message
@@ -2614,10 +2668,10 @@ __export(actions_exports, {
 // src/index.ts
 var dkgPlugin = {
   init: async (config, runtime) => {
-    logger15.info("Initializing dkg plugin");
-    logger15.info(config);
+    logger16.info("Initializing dkg plugin");
+    logger16.info(config);
     setTimeout(async () => {
-      await initDriveSync(runtime);
+      await initWithMigrations(runtime);
     }, 2e4);
   },
   name: "dkg",

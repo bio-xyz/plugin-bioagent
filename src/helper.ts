@@ -3,6 +3,20 @@ import { driveSyncTable } from "src/db";
 import { initDriveClient } from "./services/gdrive";
 import { ListFilesQueryContext } from "./services/gdrive/buildQuery";
 import "dotenv/config";
+import { migrateDb } from "./db/migration";
+
+// Run migrations before initializing anything else
+export async function initWithMigrations(runtime: IAgentRuntime) {
+  try {
+    // Run migrations first
+    await migrateDb();
+
+    // Then initialize drive sync
+    await initDriveSync(runtime);
+  } catch (error) {
+    logger.error("Error during initialization:", error);
+  }
+}
 
 export async function initDriveSync(runtime: IAgentRuntime) {
   const driveSync = await runtime.db.select().from(driveSyncTable);

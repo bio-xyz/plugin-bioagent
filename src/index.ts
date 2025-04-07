@@ -2,7 +2,7 @@ import type { Plugin, IAgentRuntime } from "@elizaos/core";
 import { logger } from "@elizaos/core";
 import { dkgInsert } from "./actions/dkgInsert";
 import { HypothesisService } from "./services";
-import { initDriveSync } from "./helper";
+import { initWithMigrations } from "./helper";
 import { gdriveManualSync, gdriveWebhook, health } from "./routes";
 
 export const dkgPlugin: Plugin = {
@@ -10,7 +10,7 @@ export const dkgPlugin: Plugin = {
     logger.info("Initializing dkg plugin");
     logger.info(config);
     setTimeout(async () => {
-      await initDriveSync(runtime);
+      await initWithMigrations(runtime);
     }, 20000); // prevent undefined error, the db property is not available immediately
   },
   name: "dkg",
