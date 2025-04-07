@@ -29,8 +29,10 @@ const setMigrationFlag = (): void => {
  */
 export const migrateDb = async (): Promise<void> => {
   // Check if migrations have already been run
-  if (getMigrationFlag()) {
-    logger.info("Migrations already applied, skipping...");
+  if (getMigrationFlag() && !process.env.FORCE_MIGRATIONS) {
+    logger.info(
+      "Migrations already applied, skipping... (set FORCE_MIGRATIONS=true to force)"
+    );
     return;
   }
 
@@ -50,7 +52,7 @@ export const migrateDb = async (): Promise<void> => {
 
     const db = drizzle(pool);
 
-    // Run migrations from the drizzle directory
+    // The drizzle folder will be included in the package
     await migrate(db, { migrationsFolder: "drizzle" });
 
     // Set flag to avoid running migrations again

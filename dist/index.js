@@ -2447,8 +2447,10 @@ var setMigrationFlag = () => {
   writeFileSync(flagPath, (/* @__PURE__ */ new Date()).toISOString());
 };
 var migrateDb = async () => {
-  if (getMigrationFlag()) {
-    logger11.info("Migrations already applied, skipping...");
+  if (getMigrationFlag() && !process.env.FORCE_MIGRATIONS) {
+    logger11.info(
+      "Migrations already applied, skipping... (set FORCE_MIGRATIONS=true to force)"
+    );
     return;
   }
   if (!process.env.POSTGRES_URL) {

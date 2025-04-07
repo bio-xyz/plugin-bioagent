@@ -20,7 +20,8 @@
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "drizzle"
   ],
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0",
