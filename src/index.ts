@@ -24,3 +24,5 @@ export const dkgPlugin: Plugin = {
 };
 
 export * as actions from "./actions";
+
+export default dkgPlugin;

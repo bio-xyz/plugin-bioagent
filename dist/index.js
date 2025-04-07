@@ -2628,8 +2628,10 @@ var dkgPlugin = {
   services: [HypothesisService],
   routes: [health, gdriveWebhook, gdriveManualSync]
 };
+var index_default = dkgPlugin;
 export {
   actions_exports as actions,
+  index_default as default,
   dkgPlugin
 };
 //# sourceMappingURL=index.js.map
