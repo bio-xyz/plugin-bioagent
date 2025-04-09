@@ -8,7 +8,6 @@ The BioAgent Plugin continuously monitors a specified Google Drive folder for ne
 
 > [!IMPORTANT]
 > This plugin is currently under development and requires additional refinement before production use. Note that the Google Drive webhook functionality only works with publicly accessible URLs. For local development, we're using ngrok to create a temporary public endpoint for the webhook. In future versions, we plan to implement a simpler approach that directly monitors changes to a local folder.
-> Also the database migrations need to be run manually right now. In the future we plan to create a CLI version of this plugin that will handle the database migrations and other setup tasks.
 
 > [!NOTE]
 > This plugin is already added to the BioAgents repo here: https://github.com/bio-xyz/bioagents
@@ -53,16 +52,7 @@ Start Oxigraph RDF triple store or use OriginTrail's DKG:
 docker run --rm -v $PWD/oxigraph:/data -p 7878:7878 ghcr.io/oxigraph/oxigraph serve --location /data --bind 0.0.0.0:7878
 ```
 
-### 5. Run Database Migrations
-
-After starting the Docker containers, generate and run the database migrations:
-
-```bash
-pnpm run db:generate
-pnpm run db:migrate
-```
-
-### 6. Launch the Development Server
+### 5. Launch the Development Server
 
 ```bash
 pnpm run dev

@@ -5,6 +5,7 @@ interface ListFilesQueryStrategy {
   getStartPageTokenParams(): Record<string, any>;
   getDriveType(): DriveType;
   getDriveId(): string;
+  getWatchFolderParams(): Record<string, any>;
 }
 
 type DriveType = "shared_folder" | "shared_drive";
@@ -31,6 +32,9 @@ class SharedDriveFolderStrategy implements ListFilesQueryStrategy {
   getDriveId(): string {
     return this.sharedDriveFolderId;
   }
+  getWatchFolderParams(): Record<string, any> {
+    return {};
+  }
 }
 
 class SharedDriveStrategy implements ListFilesQueryStrategy {
@@ -38,7 +42,7 @@ class SharedDriveStrategy implements ListFilesQueryStrategy {
 
   buildQuery(): Record<string, any> {
     return {
-      q: `'${this.sharedDriveId}' in parents and trashed=false`,
+      q: `'${this.sharedDriveId}' in parents and mimeType='application/pdf' and trashed=false`,
       orderBy: "name",
       fields: "files(id, name, md5Checksum, size)",
       supportsAllDrives: true,
@@ -61,6 +65,13 @@ class SharedDriveStrategy implements ListFilesQueryStrategy {
 
   getDriveId(): string {
     return this.sharedDriveId;
+  }
+  getWatchFolderParams(): Record<string, any> {
+    return {
+      includeItemsFromAllDrives: true,
+      supportsAllDrives: true,
+      corpora: "drive",
+    };
   }
 }
 
@@ -99,5 +110,9 @@ export class ListFilesQueryContext {
 
   getDriveId(): string {
     return this.strategy.getDriveId();
+  }
+
+  getWatchFolderParams(): Record<string, any> {
+    return this.strategy.getWatchFolderParams();
   }
 }

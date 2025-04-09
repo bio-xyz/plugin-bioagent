@@ -5,7 +5,7 @@ import "dotenv/config";
 import { existsSync, writeFileSync } from "fs";
 import path from "path";
 import { logger } from "@elizaos/core";
-
+import { sql } from "drizzle-orm";
 const { Pool } = pkg;
 
 /**
@@ -51,6 +51,8 @@ export const migrateDb = async (): Promise<void> => {
     });
 
     const db = drizzle(pool);
+
+    await db.execute(sql`CREATE SCHEMA IF NOT EXISTS biograph`);
 
     // The drizzle folder will be included in the package
     await migrate(db, { migrationsFolder: "drizzle" });

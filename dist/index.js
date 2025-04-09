@@ -2088,6 +2088,9 @@ var SharedDriveFolderStrategy = class {
   getDriveId() {
     return this.sharedDriveFolderId;
   }
+  getWatchFolderParams() {
+    return {};
+  }
 };
 var SharedDriveStrategy = class {
   constructor(sharedDriveId) {
@@ -2095,7 +2098,7 @@ var SharedDriveStrategy = class {
   }
   buildQuery() {
     return {
-      q: `'${this.sharedDriveId}' in parents and trashed=false`,
+      q: `'${this.sharedDriveId}' in parents and mimeType='application/pdf' and trashed=false`,
       orderBy: "name",
       fields: "files(id, name, md5Checksum, size)",
       supportsAllDrives: true,
@@ -2115,6 +2118,13 @@ var SharedDriveStrategy = class {
   }
   getDriveId() {
     return this.sharedDriveId;
+  }
+  getWatchFolderParams() {
+    return {
+      includeItemsFromAllDrives: true,
+      supportsAllDrives: true,
+      corpora: "drive"
+    };
   }
 };
 var ListFilesQueryContext = class {
@@ -2147,6 +2157,9 @@ var ListFilesQueryContext = class {
   }
   getDriveId() {
     return this.strategy.getDriveId();
+  }
+  getWatchFolderParams() {
+    return this.strategy.getWatchFolderParams();
   }
 };
 
@@ -2437,6 +2450,7 @@ import "dotenv/config";
 import { existsSync, writeFileSync } from "fs";
 import path3 from "path";
 import { logger as logger11 } from "@elizaos/core";
+import { sql } from "drizzle-orm";
 var { Pool: Pool2 } = pkg2;
 var getMigrationFlag = () => {
   const flagPath = path3.join(process.cwd(), ".migration-complete");
@@ -2465,6 +2479,7 @@ var migrateDb = async () => {
       connectionString: process.env.POSTGRES_URL
     });
     const db2 = drizzle2(pool2);
+    await db2.execute(sql`CREATE SCHEMA IF NOT EXISTS biograph`);
     await migrate(db2, { migrationsFolder: "drizzle" });
     setMigrationFlag();
     logger11.info("Migrations completed successfully");
@@ -2544,7 +2559,7 @@ async function syncGoogleDriveChanges(runtime) {
     params.q = `'${driveId}' in parents`;
   }
   const changesResponse = await drive.changes.list(params);
-  logger13.info(`Found ${changesResponse.data.changes?.length || 0} changes`);
+  logger13.info(`Found ${changesResponse.data.changes.length || 0} changes`);
   let processedCount = 0;
   if (changesResponse.data.changes && changesResponse.data.changes.length > 0) {
     for (const change of changesResponse.data.changes) {
@@ -2597,7 +2612,7 @@ async function syncGoogleDriveChanges(runtime) {
     );
   }
   return {
-    changes: changesResponse.data.changes?.length || 0,
+    changes: changesResponse.data.changes.length || 0,
     processed: processedCount
   };
 }
@@ -2633,7 +2648,9 @@ var gdriveManualSync = {
     try {
       logger15.info("Manual Google Drive sync triggered");
       const result = await syncGoogleDriveChanges(runtime);
+      logger15.info(`Changes: ${result.changes}`);
       while (result.changes > 0) {
+        logger15.info(`Changes: ${result.changes}`);
         await syncGoogleDriveChanges(runtime);
       }
       res.json({

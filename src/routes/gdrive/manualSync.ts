@@ -8,7 +8,9 @@ export const gdriveManualSync: Route = {
     try {
       logger.info("Manual Google Drive sync triggered");
       const result = await syncGoogleDriveChanges(runtime);
+      logger.info(`Changes: ${result.changes}`);
       while (result.changes > 0) {
+        logger.info(`Changes: ${result.changes}`);
         await syncGoogleDriveChanges(runtime);
       }
 

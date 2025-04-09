@@ -49,7 +49,7 @@ export async function syncGoogleDriveChanges(runtime: IAgentRuntime) {
   const changesResponse = await drive.changes.list(params);
 
   // Log the changes for debugging
-  logger.info(`Found ${changesResponse.data.changes?.length || 0} changes`);
+  logger.info(`Found ${changesResponse.data.changes.length || 0} changes`);
 
   // Process the changes
   let processedCount = 0;
@@ -132,7 +132,7 @@ export async function syncGoogleDriveChanges(runtime: IAgentRuntime) {
   }
 
   return {
-    changes: changesResponse.data.changes?.length || 0,
+    changes: changesResponse.data.changes.length || 0,
     processed: processedCount,
   };
 }
