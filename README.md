@@ -39,7 +39,30 @@ cd plugin-bioagent
 pnpm install
 ```
 
-### 4. Launch the Development Server
+### 4. Start Required Docker Containers
+
+Start PostgreSQL with pgvector extension for vector storage:
+
+```bash
+docker run --name plugin-bioagent-postgres -e POSTGRES_PASSWORD=123 -p 5432:5432 -d pgvector/pgvector:pg17
+```
+
+Start Oxigraph RDF triple store or use OriginTrail's DKG:
+
+```bash
+docker run --rm -v $PWD/oxigraph:/data -p 7878:7878 ghcr.io/oxigraph/oxigraph serve --location /data --bind 0.0.0.0:7878
+```
+
+### 5. Run Database Migrations
+
+After starting the Docker containers, generate and run the database migrations:
+
+```bash
+pnpm run db:generate
+pnpm run db:migrate
+```
+
+### 6. Launch the Development Server
 
 ```bash
 pnpm run dev
