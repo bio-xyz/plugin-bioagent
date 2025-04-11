@@ -765,9 +765,9 @@ function get_prompt_section_page_numbers(paper_array, sections) {
 `;
   paper_array.forEach((element) => {
     const pageNumber = element.metadata?.page_number;
-    const text4 = element.text;
+    const text6 = element.text;
     prompt += `Page ${pageNumber}:
-${text4}
+${text6}
 
 `;
   });
@@ -1549,21 +1549,21 @@ function create_section_arrays(paper_array, section_ranges) {
   const discussion_array = [];
   for (const element of paper_array) {
     const page_number = element.metadata.page_number;
-    const text4 = element.text;
+    const text6 = element.text;
     if ("introduction" in section_ranges && page_number >= section_ranges["introduction"][0] && page_number <= section_ranges["introduction"][1]) {
-      introduction_array.push(text4);
+      introduction_array.push(text6);
     }
     if ("abstract" in section_ranges && page_number >= section_ranges["abstract"][0] && page_number <= section_ranges["abstract"][1]) {
-      abstract_array.push(text4);
+      abstract_array.push(text6);
     }
     if ("methods" in section_ranges && page_number >= section_ranges["methods"][0] && page_number <= section_ranges["methods"][1]) {
-      methods_array.push(text4);
+      methods_array.push(text6);
     }
     if ("results" in section_ranges && page_number >= section_ranges["results"][0] && page_number <= section_ranges["results"][1]) {
-      results_array.push(text4);
+      results_array.push(text6);
     }
     if ("discussion" in section_ranges && page_number >= section_ranges["discussion"][0] && page_number <= section_ranges["discussion"][1]) {
-      discussion_array.push(text4);
+      discussion_array.push(text6);
     }
   }
   return {
@@ -1601,7 +1601,7 @@ async function getSummary(client, graph) {
 }
 
 // src/services/kaService/kaService.ts
-import { fromPath } from "pdf2pic";
+import { fromBuffer, fromPath } from "pdf2pic";
 import fs from "fs";
 var unstructuredApiKey = process.env.UNSTRUCTURED_API_KEY;
 async function jsonArrToKa(jsonArr, doi) {
@@ -1682,7 +1682,7 @@ var daoUals = {
 async function extractDOIFromPDF(images) {
   const client = getClient();
   const response = await client.messages.create({
-    model: "claude-3-5-haiku-20241022",
+    model: "claude-3-5-haiku-latest",
     messages: [
       {
         role: "user",
@@ -1766,6 +1766,53 @@ async function generateKaFromPdf(pdfPath, dkgClient) {
     };
   });
   cleanedKa["schema:relatedTo"] = daoUalsMap;
+  return cleanedKa;
+}
+async function generateKaFromPdfBuffer(pdfBuffer, dkgClient) {
+  const options = {
+    density: 100,
+    format: "png",
+    width: 595,
+    height: 842
+  };
+  const convert = fromBuffer(pdfBuffer, options);
+  const storeHandler = await convert.bulk(-1, { responseType: "base64" });
+  const imageMessages = storeHandler.filter((page) => page.base64).map((page) => ({
+    type: "image",
+    source: {
+      type: "base64",
+      media_type: "image/png",
+      data: page.base64
+    }
+  }));
+  logger6.info(`Extracting DOI`);
+  const doi = await extractDOIFromPDF(imageMessages);
+  if (!doi) {
+    throw new Error("Failed to extract DOI");
+  }
+  const paperArray = await makeUnstructuredApiRequest(
+    pdfBuffer,
+    "paper.pdf",
+    unstructuredApiKey
+  );
+  const ka = await jsonArrToKa(paperArray, doi);
+  const cleanedKa = removeColonsRecursively(ka);
+  const relatedDAOsString = await categorizeIntoDAOs(imageMessages);
+  const daos = JSON.parse(relatedDAOsString);
+  const daoUalsMap = daos.map((dao) => {
+    const daoUal = daoUals[dao];
+    return {
+      "@id": daoUal,
+      "@type": "schema:Organization",
+      "schema:name": dao
+    };
+  });
+  cleanedKa["schema:relatedTo"] = daoUalsMap;
+  const randomId = Math.random().toString(36).substring(2, 15);
+  fs.writeFileSync(
+    `sampleJsonLdsNew/ka-${randomId}.json`,
+    JSON.stringify(cleanedKa, null, 2)
+  );
   return cleanedKa;
 }
 
@@ -1910,106 +1957,12 @@ Read my mind on @origin_trail Decentralized Knowledge Graph ${DKG_EXPLORER_LINKS
 };
 
 // src/services/index.ts
-import { Service, logger as logger8 } from "@elizaos/core";
-var HypothesisService = class _HypothesisService extends Service {
-  constructor(runtime) {
-    super(runtime);
-    this.runtime = runtime;
-  }
-  static serviceType = "hypothesis";
-  capabilityDescription = "Generate and judge hypotheses";
-  static async start(runtime) {
-    logger8.info("*** Starting hypotheses service ***");
-    const service = new _HypothesisService(runtime);
-    runtime.registerTaskWorker({
-      name: "HGE",
-      async execute(runtime2, options, task) {
-        logger8.log("task worker");
-      }
-    });
-    const tasks = await runtime.getTasksByName("HGE");
-    if (tasks.length < 1) {
-      const taskId = await runtime.createTask({
-        name: "HGE",
-        description: "Generate and evaluate hypothesis whilst streaming them to discord",
-        tags: ["hypothesis", "judgeLLM"],
-        metadata: { updateInterval: 1500, updatedAt: Date.now() }
-      });
-      logger8.info("Task UUID:", taskId);
-    }
-    async function processRecurringTasks() {
-      logger8.info("Starting processing loop");
-      const now = Date.now();
-      const recurringTasks = await runtime.getTasks({
-        tags: ["hypothesis"]
-      });
-      logger8.info("Got tasks", recurringTasks);
-      for (const task of recurringTasks) {
-        if (!task.metadata?.updateInterval) continue;
-        const lastUpdate = task.metadata.updatedAt || 0;
-        const interval = task.metadata.updateInterval;
-        if (now >= lastUpdate + interval) {
-          logger8.info("Executing task");
-          const worker = runtime.getTaskWorker(task.name);
-          if (worker) {
-            try {
-              await worker.execute(runtime, {}, task);
-              await runtime.updateTask(task.id, {
-                metadata: {
-                  ...task.metadata,
-                  updatedAt: now
-                }
-              });
-            } catch (error) {
-              logger8.error(`Error executing task ${task.name}: ${error}`);
-            }
-          }
-        }
-      }
-    }
-    await processRecurringTasks();
-    process.on("SIGINT", async () => {
-    });
-    return service;
-  }
-  static async stop(runtime) {
-    logger8.info("*** Stopping hypotheses service ***");
-    const service = runtime.getService(_HypothesisService.serviceType);
-    if (!service) {
-      throw new Error("Hypotheses service not found");
-    }
-    service.stop();
-  }
-  async stop() {
-    logger8.info("*** Stopping hypotheses service instance ***");
-  }
-};
-
-// src/helper.ts
-import { logger as logger12 } from "@elizaos/core";
-
-// src/db/index.ts
-import { drizzle } from "drizzle-orm/node-postgres";
-import pkg from "pg";
-import "dotenv/config";
+import { Service, logger as logger10 } from "@elizaos/core";
+import { eq } from "drizzle-orm";
 
 // src/db/schemas/fileMetadata.ts
 import { text, bigint, timestamp } from "drizzle-orm/pg-core";
 import { pgSchema } from "drizzle-orm/pg-core";
-var biographPgSchema = pgSchema("biograph");
-var fileMetadataTable = biographPgSchema.table("file_metadata", {
-  id: text("id").notNull(),
-  hash: text("hash").notNull().primaryKey(),
-  fileName: text("file_name").notNull(),
-  fileSize: bigint("file_size", { mode: "number" }),
-  createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
-  modifiedAt: timestamp("modified_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
-  tags: text("tags").array()
-});
-
-// src/db/schemas/hypotheses.ts
-import { uuid, text as text2, timestamp as timestamp2, numeric } from "drizzle-orm/pg-core";
-import { pgSchema as pgSchema2 } from "drizzle-orm/pg-core";
 
 // src/db/schemas/customTypes.ts
 import { pgEnum } from "drizzle-orm/pg-core";
@@ -2022,8 +1975,28 @@ var driveTypeEnum = pgEnum("drive_type", [
   "shared_folder",
   "shared_drive"
 ]);
+var fileStatusEnum = pgEnum("file_status", [
+  "pending",
+  "processed",
+  "failed"
+]);
+
+// src/db/schemas/fileMetadata.ts
+var biographPgSchema = pgSchema("biograph");
+var fileMetadataTable = biographPgSchema.table("file_metadata", {
+  id: text("id").notNull(),
+  hash: text("hash").notNull().primaryKey(),
+  fileName: text("file_name").notNull(),
+  fileSize: bigint("file_size", { mode: "number" }),
+  status: fileStatusEnum("status").notNull().default("pending"),
+  createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+  modifiedAt: timestamp("modified_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+  tags: text("tags").array()
+});
 
 // src/db/schemas/hypotheses.ts
+import { uuid, text as text2, timestamp as timestamp2, numeric } from "drizzle-orm/pg-core";
+import { pgSchema as pgSchema2 } from "drizzle-orm/pg-core";
 var biographPgSchema2 = pgSchema2("biograph");
 var hypothesesTable = biographPgSchema2.table("hypotheses", {
   id: uuid("id").notNull().primaryKey().defaultRandom(),
@@ -2050,24 +2023,43 @@ var driveSyncTable = biographPgSchema3.table("drive_sync", {
   lastSyncAt: timestamp3("last_sync_at", { withTimezone: true, mode: "date" }).notNull().defaultNow()
 });
 
-// src/db/index.ts
-var { Pool } = pkg;
-var pool = new Pool({
-  connectionString: process.env.POSTGRES_URL
-});
-var db = drizzle(pool, {
-  schema: {
-    hypotheses: hypothesesTable,
-    fileMetadata: fileMetadataTable,
-    driveSync: driveSyncTable
+// src/db/schemas/hypothesesSummary.ts
+import { uuid as uuid3, text as text4, timestamp as timestamp4 } from "drizzle-orm/pg-core";
+import { pgSchema as pgSchema4 } from "drizzle-orm/pg-core";
+var biographPgSchema4 = pgSchema4("biograph");
+var hypothesesSummaryTable = biographPgSchema4.table(
+  "hypotheses_summary",
+  {
+    id: uuid3("id").notNull().primaryKey().defaultRandom(),
+    hypothesisId: uuid3("hypothesis_id").notNull().references(() => hypothesesTable.id, {
+      onDelete: "cascade",
+      onUpdate: "cascade"
+    }),
+    summary: text4("summary").notNull(),
+    keywords: text4("keywords").array(),
+    scientificEntities: text4("scientific_entities").array(),
+    createdAt: timestamp4("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+    updatedAt: timestamp4("updated_at", { withTimezone: true, mode: "date" }).notNull().defaultNow()
   }
+);
+
+// src/db/schemas/gdriveChannels.ts
+import { text as text5, pgSchema as pgSchema5, timestamp as timestamp5 } from "drizzle-orm/pg-core";
+var biographSchema = pgSchema5("biograph");
+var gdriveChannelsTable = biographSchema.table("gdrive_channels", {
+  kind: text5("kind"),
+  id: text5("id").notNull().primaryKey(),
+  resourceId: text5("resource_id").notNull(),
+  resourceUri: text5("resource_uri"),
+  expiration: timestamp5("expiration", { withTimezone: true }).notNull(),
+  createdAt: timestamp5("created_at", { withTimezone: true }).defaultNow()
 });
 
 // src/services/gdrive/client.ts
 import { google } from "googleapis";
 
 // src/services/gdrive/buildQuery.ts
-import { logger as logger9 } from "@elizaos/core";
+import { logger as logger8 } from "@elizaos/core";
 var SharedDriveFolderStrategy = class {
   constructor(sharedDriveFolderId) {
     this.sharedDriveFolderId = sharedDriveFolderId;
@@ -2131,7 +2123,7 @@ var ListFilesQueryContext = class {
   strategy;
   constructor(mainFolderId, sharedDriveId) {
     if (mainFolderId && sharedDriveId) {
-      logger9.error(
+      logger8.error(
         "You cannot populate both GOOGLE_DRIVE_FOLDER_ID and SHARED_DRIVE_ID."
       );
       process.exit(1);
@@ -2140,7 +2132,7 @@ var ListFilesQueryContext = class {
     } else if (mainFolderId) {
       this.strategy = new SharedDriveFolderStrategy(mainFolderId);
     } else {
-      logger9.error(
+      logger8.error(
         "Either GOOGLE_DRIVE_FOLDER_ID or SHARED_DRIVE_ID must be defined."
       );
       process.exit(1);
@@ -2185,11 +2177,11 @@ var FOLDERS = {
 };
 
 // src/services/gdrive/watchFiles.ts
-import { logger as logger10 } from "@elizaos/core";
+import { logger as logger9 } from "@elizaos/core";
 import { fileURLToPath } from "url";
 import { dirname } from "path";
 import DKG2 from "dkg.js";
-import { fromBuffer } from "pdf2pic";
+import { fromBuffer as fromBuffer2 } from "pdf2pic";
 
 // src/services/gdrive/extract/config.ts
 import "dotenv/config";
@@ -2319,7 +2311,10 @@ var defaultContext = {
   eco: "http://purl.org/obo/ECO_",
   mondo: "http://purl.org/obo/MONDO_",
   comptox: "https://comptox.epa.gov/",
-  mesh: "http://id.nlm.nih.gov/mesh/"
+  mesh: "http://id.nlm.nih.gov/mesh/",
+  doco: "http://purl.org/spar/doco/",
+  pro: "http://purl.org/spar/pro/",
+  obi: "http://purl.obolibrary.org/obo/"
 };
 var ContextSchema = z.object({
   schema: z.literal("https://schema.org/"),
@@ -2336,13 +2331,16 @@ var ContextSchema = z.object({
   eco: z.literal("http://purl.org/obo/ECO_"),
   mondo: z.literal("http://purl.org/obo/MONDO_"),
   comptox: z.literal("https://comptox.epa.gov/"),
-  mesh: z.literal("http://id.nlm.nih.gov/mesh/")
+  mesh: z.literal("http://id.nlm.nih.gov/mesh/"),
+  doco: z.literal("http://purl.org/spar/doco/").optional(),
+  pro: z.literal("http://purl.org/spar/pro/").optional(),
+  obi: z.literal("http://purl.obolibrary.org/obo/").optional()
 }).default(defaultContext).describe(
-  "Context prefixes for JSON-LD, mapping short prefixes (e.g. go:) to full IRIs."
+  "Context prefixes for JSON-LD, mapping short prefixes (e.g. go:) to full IRIs to enable semantic interoperability."
 );
 var CreatorSchema = z.object({
   "@id": z.string().describe(
-    "Unique identifier for the creator, typically an ORCID URI. Defaults to a kebab-case of the creator's name."
+    "Unique identifier for the creator, typically an ORCID URI (e.g., https://orcid.org/0000-0003-8245-1234)."
   ).default(`https://orcid.org/${crypto.randomUUID()}`),
   "@type": z.string().describe(
     "RDF type of the creator (e.g. foaf:Person). Identifies the class of this entity in Linked Data."
@@ -2378,53 +2376,132 @@ var SectionSchema = z.object({
 });
 var CitationSchema = z.object({
   "@id": z.string().describe(
-    "A unique identifier (often a DOI) for the cited work being referenced."
+    "A unique identifier (often a DOI) for the cited work being referenced, e.g., https://doi.org/10.1016/j.cell.2005.05.012."
   ),
-  "@type": z.string().describe(
+  "@type": z.string().optional().describe(
     "RDF type of the cited resource, e.g. 'bibo:AcademicArticle' or 'schema:ScholarlyArticle'."
   ),
   "dcterms:title": z.string().describe("Title of the cited work or resource."),
-  "bibo:doi": z.string().describe(
+  "bibo:doi": z.string().optional().describe(
     "Explicit DOI string of the cited work, e.g. '10.1038/s41586-020-XXXXX'."
   )
 });
-var OntologySchema = z.object({
+var OntologyTermSchema = z.object({
   "@id": z.string().describe(
-    "Compact or full IRI of the ontology term discussed in the paper (e.g. GO, DOID, CHEBI, ATC, etc.) or 'http://purl.obolibrary.org/obo/xxx'."
+    "IRI of the ontology term (e.g., http://purl.obolibrary.org/obo/GO_0070765 for 'gamma secretase activity')."
   ),
+  "schema:name": z.string().optional().describe(
+    "Human-readable label of the ontology term (e.g., 'gamma secretase activity')."
+  ),
+  "dcterms:name": z.string().optional().describe(
+    "Alternative property for human-readable name of the ontology term."
+  ),
+  "dcterms:title": z.string().optional().describe(
+    "Title of the ontology term, typically used for disease or chemical entities."
+  ),
+  "dcterms:description": z.string().optional().describe(
+    "Detailed description of the ontology term and its relevance to the paper."
+  ),
+  "obi:RO_0002304": z.lazy(() => OntologyTermSchema).optional().describe(
+    "Represents a 'regulates' relationship to another ontology term."
+  ),
+  "obi:BFO_0000050": z.lazy(() => OntologyTermSchema).optional().describe("Represents a 'part of' relationship to another ontology term."),
+  "obi:RO_0002233": z.lazy(() => OntologyTermSchema).optional().describe(
+    "Represents a 'has input' relationship to another ontology term."
+  )
+});
+var CellLineSchema = z.object({
+  "@id": z.string().describe(
+    "IRI of the cell line or biological material (e.g., http://purl.obolibrary.org/obo/CLO_0009443)."
+  ),
+  "dcterms:description": z.string().describe(
+    "Description of the cell lines or biological materials used in the research."
+  )
+});
+var ExperimentalMethodSchema = z.object({
+  "@id": z.string().describe(
+    "IRI of the experimental method (e.g., http://purl.obolibrary.org/obo/OBI_0000070)."
+  ),
+  "dcterms:description": z.string().describe("Description of the experimental method used in the research.")
+});
+var CompetingInterestSchema = z.object({
+  "@id": z.string().describe("IRI related to competing interests declaration."),
+  "dcterms:description": z.string().describe(
+    "Statement regarding competing interests or conflicts of interest."
+  )
+});
+var RelatedOrganizationSchema = z.object({
+  "@id": z.string().describe(
+    "Identifier for the related organization, typically a DID (e.g., did:dkg:base:84532/...)."
+  ),
+  "@type": z.string().describe("Type of the related entity, typically 'schema:Organization'."),
   "schema:name": z.string().describe(
-    "Human-readable label of the ontology concept discussed in the paper"
+    "Name of the related organization (e.g., 'VitaDAO', 'Cerebrum DAO')."
   )
 });
 var OntologiesSchema = z.object({
-  ontologies: z.array(OntologySchema)
+  ontologies: z.array(OntologyTermSchema)
 });
 var PaperSchema = z.object({
   "@context": ContextSchema,
-  "@id": z.string().describe("Top-level identifier for the paper, typically a DOI.").default(`https://doi.org/10.1234/${crypto.randomInt(1e4, 99999)}`),
+  "@id": z.string().describe(
+    "Top-level identifier for the paper, typically a DOI (e.g., https://doi.org/10.1371/journal.pone.0173240)."
+  ).default(`https://doi.org/10.1234/${crypto.randomInt(1e4, 99999)}`),
   "@type": z.string().describe(
-    "Type of the paper, typically 'bibo:AcademicArticle' or 'schema:ScholarlyArticle'."
+    "Type of the paper (e.g., 'fabio:ResearchPaper', 'bibo:AcademicArticle', 'schema:ScholarlyArticle')."
   ),
-  "dcterms:title": z.string().describe("Title of the paper, e.g. 'A Study on ...'."),
+  "dcterms:title": z.string().describe("Full title of the paper as it appears in the publication."),
   "dcterms:creator": z.array(CreatorSchema).describe(
-    "List of creators (authors). Each entry follows CreatorSchema, containing @id, @type, foaf:name."
+    "List of authors/creators of the paper, with their identifiers and names."
   ),
-  "dcterms:abstract": z.string().describe("Abstract text summarizing the paper's content and findings."),
-  "schema:datePublished": z.string().describe("Publication date, usually an ISO 8601 string (YYYY-MM-DD)."),
-  "schema:keywords": z.array(z.string()).describe(
+  "dcterms:abstract": z.string().describe(
+    "Complete abstract text summarizing the paper's content, methods, and findings."
+  ),
+  "dcterms:date": z.string().optional().describe("Publication date in YYYY-MM-DD format."),
+  "schema:datePublished": z.string().optional().describe(
+    "Alternative property for publication date, usually in ISO 8601 format (YYYY-MM-DD)."
+  ),
+  "dcterms:publisher": z.string().optional().describe(
+    "Name of the publisher of the paper (e.g., 'PLOS ONE', 'Nature Publishing Group')."
+  ),
+  "fabio:hasJournalVolume": z.string().optional().describe(
+    "Volume number of the journal in which the paper was published."
+  ),
+  "fabio:hasJournalIssue": z.string().optional().describe(
+    "Issue number of the journal in which the paper was published."
+  ),
+  "fabio:hasPageNumbers": z.string().optional().describe(
+    "Page range of the paper in the publication (e.g., '1-18', '234-245')."
+  ),
+  "dcterms:identifier": z.string().optional().describe("Alternative identifier for the paper, typically a DOI URL."),
+  "schema:keywords": z.array(z.string()).optional().describe(
     "List of keywords or key phrases describing the paper's topics."
   ),
-  "fabio:hasPublicationVenue": PublicationVenueSchema.describe(
+  "fabio:hasPublicationVenue": PublicationVenueSchema.optional().describe(
     "Metadata about where this paper was published (journal, conference, etc.)."
   ),
-  "fabio:hasPart": z.array(SectionSchema).describe(
-    "Sections that compose the paper. Each section has an @id, @type, title, and content."
+  "fabio:hasPart": z.array(SectionSchema).optional().describe(
+    "Structured sections that compose the paper (with @id, @type, title, and content)."
+  ),
+  "dcterms:hasPart": z.string().optional().describe(
+    "Plain text representation of the paper's content, useful for full-text search and analysis."
   ),
   "cito:cites": z.array(CitationSchema).describe(
-    "References/citations this paper includes. Each entry has an identifier, type, title, and DOI."
+    "References/citations the paper includes, with identifiers and titles."
+  ),
+  "obi:OBI_0000299": z.array(OntologyTermSchema).optional().describe(
+    "Ontology terms and concepts discussed in the paper, with rich relationships and descriptions."
+  ),
+  "obi:OBI_0000293": z.array(CellLineSchema).optional().describe("Cell lines or biological materials used in the research."),
+  "obi:OBI_0000070": z.array(ExperimentalMethodSchema).optional().describe("Experimental methods used in the research."),
+  "obi:IAO_0000616": z.array(CompetingInterestSchema).optional().describe(
+    "Declarations regarding competing interests or conflicts of interest."
+  ),
+  "schema:relatedTo": z.array(RelatedOrganizationSchema).optional().describe(
+    "Organizations or entities related to the paper, such as funders or stakeholders."
   )
 }).describe(
-  "Complete JSON-LD schema for a scientific paper, including authors, venue, sections, citations, and ontology references."
+  "Comprehensive JSON-LD schema for a scientific paper, capturing bibliographic metadata, content, ontology terms, and semantic relationships."
 );
 
 // src/services/gdrive/extract/index.ts
@@ -2434,12 +2511,231 @@ var __dirname2 = path2.resolve();
 import { Store } from "n3";
 import { JsonLdParser } from "jsonld-streaming-parser";
 import axios4 from "axios";
+import crypto2 from "crypto";
+function addMissingIdsToJsonLd(jsonLdString) {
+  const data = JSON.parse(jsonLdString);
+  function ensureId(obj) {
+    if (Array.isArray(obj)) {
+      for (const item of obj) {
+        ensureId(item);
+      }
+    } else if (obj && typeof obj === "object") {
+      if (obj["@context"]) {
+        const contextValue = obj["@context"];
+        delete obj["@context"];
+        if (!obj["@id"]) {
+          obj["@id"] = crypto2.randomUUID();
+        }
+        for (const key of Object.keys(obj)) {
+          ensureId(obj[key]);
+        }
+        obj["@context"] = contextValue;
+      } else {
+        if (!obj["@id"]) {
+          obj["@id"] = crypto2.randomUUID();
+        }
+        for (const key of Object.keys(obj)) {
+          ensureId(obj[key]);
+        }
+      }
+    }
+  }
+  ensureId(data);
+  return JSON.stringify(data, null, 2);
+}
+async function storeJsonLd(jsonLd) {
+  const store = new Store();
+  const parser = new JsonLdParser();
+  const fixedJsonLdString = addMissingIdsToJsonLd(JSON.stringify(jsonLd));
+  return new Promise((resolve, reject) => {
+    parser.on("data", (quad) => {
+      store.addQuad(quad);
+    });
+    parser.on("error", (error) => {
+      console.error("Parsing error:", error);
+      reject(error);
+    });
+    parser.on("end", async () => {
+      try {
+        console.log(`Parsed ${store.size} quads`);
+        const ntriples = store.getQuads(null, null, null, null).map(
+          (quad) => `<${quad.subject.value}> <${quad.predicate.value}> ${quad.object.termType === "Literal" ? `"${quad.object.value}"` : `<${quad.object.value}>`}.`
+        ).join("\n");
+        const response = await axios4.post(
+          "http://localhost:7878/store",
+          ntriples,
+          {
+            headers: {
+              "Content-Type": "application/n-quads"
+            }
+          }
+        );
+        if (response.status === 204) {
+          console.log("Successfully stored JSON-LD in Oxigraph");
+          resolve(true);
+        } else {
+          reject(new Error(`Unexpected response status: ${response.status}`));
+        }
+      } catch (error) {
+        console.error("Error storing JSON-LD in Oxigraph:", error);
+        reject(error);
+      }
+    });
+    try {
+      parser.write(fixedJsonLdString);
+      parser.end();
+    } catch (error) {
+      console.error("Error during parser execution:", error);
+      reject(error);
+    }
+  });
+}
+
+// src/db/index.ts
+import { drizzle } from "drizzle-orm/node-postgres";
+import pkg from "pg";
+import "dotenv/config";
+var { Pool } = pkg;
+var pool = new Pool({
+  connectionString: process.env.POSTGRES_URL
+});
+var db = drizzle(pool, {
+  schema: {
+    hypotheses: hypothesesTable,
+    fileMetadata: fileMetadataTable,
+    driveSync: driveSyncTable,
+    hypothesesSummary: hypothesesSummaryTable,
+    gdriveChannels: gdriveChannelsTable
+  }
+});
 
 // src/services/gdrive/watchFiles.ts
 var __filename = fileURLToPath(import.meta.url);
 var __dirname3 = dirname(__filename);
+async function downloadFile(drive, file) {
+  const res = await drive.files.get(
+    {
+      fileId: file.id,
+      alt: "media"
+    },
+    {
+      responseType: "arraybuffer",
+      params: {
+        supportsAllDrives: true,
+        acknowledgeAbuse: true
+      },
+      headers: {
+        Range: "bytes=0-"
+      }
+    }
+  );
+  return Buffer.from(res.data);
+}
+
+// src/services/index.ts
+var HypothesisService = class _HypothesisService extends Service {
+  constructor(runtime) {
+    super(runtime);
+    this.runtime = runtime;
+  }
+  static serviceType = "hypothesis";
+  capabilityDescription = "Generate and judge hypotheses";
+  static async start(runtime) {
+    logger10.info("*** Starting hypotheses service ***");
+    const service = new _HypothesisService(runtime);
+    runtime.registerTaskWorker({
+      name: "PROCESS_PDF",
+      async execute(runtime2, options, task) {
+        await runtime2.updateTask(task.id, {
+          metadata: {
+            updatedAt: Date.now()
+          }
+        });
+        const fileId = task.metadata.fileId;
+        const fileInfo = {
+          id: fileId
+        };
+        const drive = await initDriveClient();
+        logger10.info("Downloading file");
+        const fileBuffer = await downloadFile(drive, fileInfo);
+        logger10.info("Generating KA");
+        const ka = await generateKaFromPdfBuffer(fileBuffer, runtime2);
+        try {
+          const success = await storeJsonLd(ka);
+          if (success) {
+            logger10.info("Successfully stored KA data in Oxigraph");
+          }
+        } catch (error) {
+          logger10.error("Error storing KA in knowledge graph:", error);
+        }
+        logger10.log("task worker");
+        await runtime2.deleteTask(task.id);
+        await runtime2.db.update(fileMetadataTable).set({ status: "processed" }).where(eq(fileMetadataTable.id, fileId));
+      }
+    });
+    async function processRecurringTasks() {
+      logger10.info("Starting processing loop");
+      const now = Date.now();
+      const recurringTasks = await runtime.getTasks({
+        tags: ["hypothesis"]
+      });
+      logger10.info("Got tasks", recurringTasks);
+      for (const task of recurringTasks) {
+        if (!task.metadata?.updateInterval) continue;
+        const lastUpdate = task.metadata.updatedAt || 0;
+        const interval = task.metadata.updateInterval;
+        logger10.info(`Now: ${now}`);
+        logger10.info(`Last update: ${lastUpdate}`);
+        logger10.info(`Interval: ${interval}`);
+        logger10.info(
+          `Now >= lastUpdate + interval: ${now >= lastUpdate + interval}`
+        );
+        logger10.info(`lastUpdate + interval: ${lastUpdate + interval}`);
+        if (now >= lastUpdate + interval) {
+          logger10.info("Executing task");
+          const worker = runtime.getTaskWorker(task.name);
+          if (worker) {
+            try {
+              await worker.execute(runtime, {}, task);
+              await runtime.updateTask(task.id, {
+                metadata: {
+                  ...task.metadata,
+                  updatedAt: now
+                }
+              });
+            } catch (error) {
+              logger10.error(`Error executing task ${task.name}: ${error}`);
+            }
+          }
+        }
+      }
+    }
+    await processRecurringTasks();
+    setInterval(
+      async () => {
+        await processRecurringTasks();
+      },
+      3 * 60 * 1e3
+    );
+    process.on("SIGINT", async () => {
+    });
+    return service;
+  }
+  static async stop(runtime) {
+    logger10.info("*** Stopping hypotheses service ***");
+    const service = runtime.getService(_HypothesisService.serviceType);
+    if (!service) {
+      throw new Error("Hypotheses service not found");
+    }
+    service.stop();
+  }
+  async stop() {
+    logger10.info("*** Stopping hypotheses service instance ***");
+  }
+};
 
 // src/helper.ts
+import { logger as logger12 } from "@elizaos/core";
 import "dotenv/config";
 
 // src/db/migration.ts
@@ -2450,7 +2746,7 @@ import "dotenv/config";
 import { existsSync, writeFileSync } from "fs";
 import path3 from "path";
 import { logger as logger11 } from "@elizaos/core";
-import { sql } from "drizzle-orm";
+import { sql as sql2 } from "drizzle-orm";
 var { Pool: Pool2 } = pkg2;
 var getMigrationFlag = () => {
   const flagPath = path3.join(process.cwd(), ".migration-complete");
@@ -2479,7 +2775,7 @@ var migrateDb = async () => {
       connectionString: process.env.POSTGRES_URL
     });
     const db2 = drizzle2(pool2);
-    await db2.execute(sql`CREATE SCHEMA IF NOT EXISTS biograph`);
+    await db2.execute(sql2`CREATE SCHEMA IF NOT EXISTS biograph`);
     await migrate(db2, { migrationsFolder: "drizzle" });
     setMigrationFlag();
     logger11.info("Migrations completed successfully");
@@ -2528,22 +2824,48 @@ async function initDriveSync(runtime) {
 import { logger as logger14 } from "@elizaos/core";
 
 // src/routes/controller.ts
-import { eq } from "drizzle-orm";
+import { eq as eq2 } from "drizzle-orm";
 import { logger as logger13 } from "@elizaos/core";
 async function syncGoogleDriveChanges(runtime) {
-  const driveSync = await runtime.db.select().from(driveSyncTable);
-  if (driveSync.length === 0) {
-    logger13.error("No drive sync found, cannot process changes");
-    throw new Error("Drive sync not initialized");
-  }
-  const syncRecord = driveSync[0];
-  const { id: driveId, startPageToken, driveType } = syncRecord;
+  const driveSync = await fetchDriveSyncRecord(runtime);
+  const { id: driveId, startPageToken, driveType } = driveSync;
   const drive = await initDriveClient([
     "https://www.googleapis.com/auth/drive.appdata",
     "https://www.googleapis.com/auth/drive.file",
     "https://www.googleapis.com/auth/drive.metadata.readonly",
     "https://www.googleapis.com/auth/drive"
   ]);
+  const params = buildDriveParams(startPageToken, driveId, driveType);
+  const changesResponse = await drive.changes.list(params);
+  const changes = changesResponse.data.changes || [];
+  logger13.info(`Found ${changes.length} changes in Google Drive`);
+  let processedCount = 0;
+  for (const change of changes) {
+    if (!change.fileId) continue;
+    processedCount++;
+    await processChange(runtime, change);
+  }
+  if (changesResponse.data.newStartPageToken) {
+    await updatePageToken(
+      runtime,
+      driveId,
+      changesResponse.data.newStartPageToken
+    );
+  }
+  return {
+    changes: changes.length,
+    processed: processedCount
+  };
+}
+async function fetchDriveSyncRecord(runtime) {
+  const driveSync = await runtime.db.select().from(driveSyncTable);
+  if (driveSync.length === 0) {
+    logger13.error("No drive sync found, cannot process changes");
+    throw new Error("Drive sync not initialized");
+  }
+  return driveSync[0];
+}
+function buildDriveParams(startPageToken, driveId, driveType) {
   const params = {
     pageToken: startPageToken,
     includeRemoved: true,
@@ -2558,72 +2880,108 @@ async function syncGoogleDriveChanges(runtime) {
     params.restrictToMyDrive = false;
     params.q = `'${driveId}' in parents`;
   }
-  const changesResponse = await drive.changes.list(params);
-  logger13.info(`Found ${changesResponse.data.changes.length || 0} changes`);
-  let processedCount = 0;
-  if (changesResponse.data.changes && changesResponse.data.changes.length > 0) {
-    for (const change of changesResponse.data.changes) {
-      if (!change.fileId) continue;
-      processedCount++;
-      if (change.removed) {
-        logger13.info(
-          `File ${change.fileId} removed from trash - no action needed`
-        );
-      } else if (change.file?.trashed) {
-        logger13.info(
-          `File ${change.fileId} moved to trash - removing from database`
-        );
-        await runtime.db.delete(fileMetadataTable).where(eq(fileMetadataTable.id, change.fileId));
-      } else if (change.file && !change.file.trashed) {
-        const file = change.file;
-        if (file.mimeType === "application/pdf") {
-          logger13.info(`Processing PDF file: ${file.name}`);
-          await runtime.db.insert(fileMetadataTable).values({
-            id: file.id,
-            hash: file.md5Checksum,
-            fileName: file.name,
-            fileSize: Number(file.size),
-            modifiedAt: /* @__PURE__ */ new Date()
-          }).onConflictDoUpdate({
-            target: fileMetadataTable.hash,
-            set: {
-              fileName: file.name,
-              fileSize: Number(file.size),
-              modifiedAt: /* @__PURE__ */ new Date(),
-              id: file.id
-            }
-          });
-          logger13.info(
-            `Saved/updated file metadata for ${file.name} (${file.id})`
-          );
-        } else {
-          logger13.info(`Skipping non-PDF file: ${file.name} (${file.mimeType})`);
-        }
-      }
-    }
+  return params;
+}
+async function processChange(runtime, change) {
+  if (change.removed) {
+    logger13.info(`File ${change.fileId} removed from trash - no action needed`);
+    return;
   }
-  if (changesResponse.data.newStartPageToken) {
-    await runtime.db.update(driveSyncTable).set({
-      startPageToken: changesResponse.data.newStartPageToken,
-      lastSyncAt: /* @__PURE__ */ new Date()
-    }).where(eq(driveSyncTable.id, driveId));
+  if (change.file?.trashed) {
     logger13.info(
-      `Updated start page token to: ${changesResponse.data.newStartPageToken}`
+      `File ${change.fileId} moved to trash - removing from database`
     );
+    await runtime.db.delete(fileMetadataTable).where(eq2(fileMetadataTable.id, change.fileId));
+    return;
   }
-  return {
-    changes: changesResponse.data.changes.length || 0,
-    processed: processedCount
-  };
+  if (change.file && !change.file.trashed) {
+    await processFile(runtime, change.file);
+  }
+}
+async function processFile(runtime, file) {
+  if (file.mimeType !== "application/pdf") {
+    logger13.info(`Skipping non-PDF file: ${file.name} (${file.mimeType})`);
+    return;
+  }
+  const fileExists = await runtime.db.select().from(fileMetadataTable).where(eq2(fileMetadataTable.hash, file.md5Checksum));
+  if (fileExists.length > 0) {
+    logger13.info(`File ${file.name} already exists, skipping`);
+    return;
+  }
+  const result = await runtime.db.insert(fileMetadataTable).values({
+    id: file.id,
+    hash: file.md5Checksum,
+    fileName: file.name,
+    fileSize: Number(file.size),
+    modifiedAt: /* @__PURE__ */ new Date()
+  }).onConflictDoUpdate({
+    target: fileMetadataTable.hash,
+    set: {
+      fileName: file.name,
+      fileSize: Number(file.size),
+      modifiedAt: /* @__PURE__ */ new Date(),
+      id: file.id
+    }
+  }).returning();
+  logger13.info(`Result: ${JSON.stringify(result)}`);
+  if (result.length > 0) {
+    logger13.info(`Adding task to queue: ${file.name}`);
+    await runtime.createTask({
+      name: "PROCESS_PDF",
+      description: "Convert PDF to RDF triples and save to Oxigraph",
+      tags: ["rdf", "graph", "process", "hypothesis"],
+      metadata: {
+        updateInterval: 3 * 60 * 1e3,
+        updatedAt: Date.now(),
+        fileId: file.id,
+        fileName: file.name,
+        modifiedAt: /* @__PURE__ */ new Date()
+      }
+    });
+    logger13.info(`Saved/updated file metadata for ${file.name} (${file.id})`);
+  } else {
+    logger13.info(`File ${file.name} hasn't changed, skipping task creation`);
+  }
+}
+async function updatePageToken(runtime, driveId, newToken) {
+  await runtime.db.update(driveSyncTable).set({
+    startPageToken: newToken,
+    lastSyncAt: /* @__PURE__ */ new Date()
+  }).where(eq2(driveSyncTable.id, driveId));
+  logger13.info(`Updated start page token to: ${newToken}`);
 }
 
 // src/routes/gdrive/webhook.ts
 var gdriveWebhook = {
   path: "/gdrive/webhook",
   type: "POST",
-  handler: async (_req, res, runtime) => {
+  handler: async (req, res, runtime) => {
     try {
       logger14.info("Google Drive webhook triggered");
+      const channelId = req.headers["x-goog-channel-id"];
+      if (!channelId) {
+        logger14.warn("Missing x-goog-channel-id header in webhook request");
+        return res.status(400).json({
+          message: "Missing required channel ID header"
+        });
+      }
+      const channels = await runtime.db.select().from(gdriveChannelsTable);
+      if (channels.length === 0) {
+        logger14.warn("No channels found in database");
+        return res.status(500).json({
+          message: "No channels configured"
+        });
+      }
+      const validChannelId = channels[0].id;
+      if (channelId !== validChannelId) {
+        logger14.warn(
+          `Invalid channel ID received: ${channelId}, expected: ${validChannelId}`
+        );
+        return res.status(403).json({
+          message: "Invalid channel ID"
+        });
+      }
+      logger14.info(`Valid webhook from channel: ${channelId}`);
       const result = await syncGoogleDriveChanges(runtime);
       res.json({
         message: "OK",

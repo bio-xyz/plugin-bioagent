@@ -10,3 +10,9 @@ export const driveTypeEnum = pgEnum("drive_type", [
   "shared_folder",
   "shared_drive",
 ]);
+
+export const fileStatusEnum = pgEnum("file_status", [
+  "pending",
+  "processed",
+  "failed",
+]);

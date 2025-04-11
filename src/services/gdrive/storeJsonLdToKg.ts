@@ -1,18 +1,71 @@
 import { Store, Quad } from "n3";
 import { JsonLdParser } from "jsonld-streaming-parser";
 import axios from "axios";
+import crypto from "crypto";
 
 /**
- * Accepts a JSON-LD object, parses it, and stores the resulting data in Oxigraph.
- * @param jsonLd A JSON-LD object to be parsed.
- * @returns A promise that resolves with `true` if successful.
+ * Recursively adds an @id field (with a random UUID) to all objects
+ * in the parsed JSON-LD data structure that are missing the @id property.
+ * This function skips the @context node to avoid "keyword redefinition" errors.
+ */
+function addMissingIdsToJsonLd(jsonLdString: string): string {
+  // Parse the input JSON-LD string into an object
+  const data = JSON.parse(jsonLdString);
+
+  function ensureId(obj: any): void {
+    if (Array.isArray(obj)) {
+      // If it's an array, recurse on each element
+      for (const item of obj) {
+        ensureId(item);
+      }
+    } else if (obj && typeof obj === "object") {
+      // If this object has a `@context`, skip going into it
+      // so we don't accidentally insert @id into the @context object
+      if (obj["@context"]) {
+        // STOP recursion into @context
+        // But still handle the top-level object’s other properties (besides @context)
+        const contextValue = obj["@context"];
+        delete obj["@context"]; // Temporarily remove @context
+        if (!obj["@id"]) {
+          obj["@id"] = crypto.randomUUID();
+        }
+        // Recurse on other keys (excluding @context which we removed)
+        for (const key of Object.keys(obj)) {
+          ensureId(obj[key]);
+        }
+        // Put @context back in its place after
+        obj["@context"] = contextValue;
+      } else {
+        // If not dealing with the @context, we can safely add an @id
+        if (!obj["@id"]) {
+          obj["@id"] = crypto.randomUUID();
+        }
+        // Recurse on all children
+        for (const key of Object.keys(obj)) {
+          ensureId(obj[key]);
+        }
+      }
+    }
+  }
+
+  ensureId(data);
+
+  // Return the stringified JSON-LD (with newly added @id fields, skipping the context)
+  return JSON.stringify(data, null, 2);
+}
+
+/**
+ * Accepts a JSON-LD object, ensures valid @id fields, parses it to quads, and
+ * stores the resulting data in Oxigraph. Returns a promise that resolves with `true` if successful.
  */
 export async function storeJsonLd(jsonLd: object): Promise<boolean> {
   const store = new Store();
   const parser = new JsonLdParser();
 
+  // Fix / add valid @id fields
+  const fixedJsonLdString = addMissingIdsToJsonLd(JSON.stringify(jsonLd));
+
   return new Promise((resolve, reject) => {
-    // Attach stream listeners
     parser.on("data", (quad: Quad) => {
       store.addQuad(quad);
     });
@@ -62,9 +115,9 @@ export async function storeJsonLd(jsonLd: object): Promise<boolean> {
       }
     });
 
-    // Begin parsing
+    // Begin parsing the fixed JSON-LD
     try {
-      parser.write(JSON.stringify(jsonLd));
+      parser.write(fixedJsonLdString);
       parser.end();
     } catch (error: any) {
       console.error("Error during parser execution:", error);

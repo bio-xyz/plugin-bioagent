@@ -67,7 +67,7 @@ export async function generateKa(images: OpenAIImage[]) {
     extractOntologies(images),
   ]);
   console.log(`[generateKa] All extractions completed, combining results`);
-  res[0]["ontologies"] = res[1];
+  res[0]["ontologies"] = res[1]["ontologies"];
   console.log(`[generateKa] Knowledge extraction successfully completed`);
   return res[0];
 }

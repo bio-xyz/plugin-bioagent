@@ -19,14 +19,14 @@ const __dirname = dirname(__filename);
 type DKGClient = typeof DKG | null;
 let DkgClient: DKGClient = null;
 
-interface FileInfo {
+export interface FileInfo {
   id: string;
-  name: string;
-  md5Checksum: string;
-  size: number;
+  name?: string;
+  md5Checksum?: string;
+  size?: number;
 }
 
-async function downloadFile(
+export async function downloadFile(
   drive: drive_v3.Drive,
   file: FileInfo
 ): Promise<Buffer> {
