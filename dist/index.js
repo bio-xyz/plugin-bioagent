@@ -2795,29 +2795,169 @@ async function initWithMigrations(runtime) {
     logger12.error("Error during initialization:", error);
   }
 }
+var ENV = process.env.ENV || "dev";
+var deployedUrl = ENV === "dev" ? process.env.DEV_URL : process.env.PROD_URL;
+async function watchFolderChanges(folderId, callbackUrl, drive, options = {}) {
+  const response = await drive.files.watch({
+    fileId: folderId,
+    ...options,
+    requestBody: {
+      id: `channel-${Date.now()}`,
+      type: "web_hook",
+      address: callbackUrl,
+      payload: true,
+      expiration: (Date.now() + 6048e5).toString()
+      // 7 days
+    }
+  });
+  logger12.info("Watch channel created:", JSON.stringify(response.data, null, 2));
+  return response.data;
+}
+async function stopWatchingChanges(channelId, resourceId, drive) {
+  await drive.channels.stop({
+    requestBody: {
+      id: channelId,
+      resourceId
+    }
+  });
+  logger12.info(`Stopped watching channel ${channelId}`);
+}
 async function initDriveSync(runtime) {
+  const driveClient = await createDriveClient();
+  const queryContext = createQueryContext();
+  await setupDriveSyncRecord(runtime, driveClient, queryContext);
+  await setupWatchChannel(runtime, driveClient, queryContext);
+}
+async function createDriveClient() {
+  return await initDriveClient([
+    "https://www.googleapis.com/auth/drive.readonly",
+    "https://www.googleapis.com/auth/drive.metadata.readonly"
+  ]);
+}
+function createQueryContext() {
+  return new ListFilesQueryContext(
+    process.env.GOOGLE_DRIVE_FOLDER_ID,
+    process.env.SHARED_DRIVE_ID
+  );
+}
+async function setupDriveSyncRecord(runtime, driveClient, queryContext) {
+  const startPageTokenParams = queryContext.getStartPageTokenParams();
+  const startPageTokenResponse = await driveClient.changes.getStartPageToken(startPageTokenParams);
+  const startPageToken = startPageTokenResponse.data.startPageToken;
+  const driveType = queryContext.getDriveType();
+  const driveId = queryContext.getDriveId();
   const driveSync = await runtime.db.select().from(driveSyncTable);
   if (driveSync.length === 0) {
-    logger12.info("Initializing drive sync");
     logger12.info("No drive sync found, creating new one");
-    const driveClient = await initDriveClient();
-    const listFilesQueryContext = new ListFilesQueryContext(
-      process.env.GOOGLE_DRIVE_FOLDER_ID,
-      process.env.SHARED_DRIVE_ID
-    );
-    const startPageTokenParams = listFilesQueryContext.getStartPageTokenParams();
-    const startPageTokenResponse = await driveClient.changes.getStartPageToken(startPageTokenParams);
-    const startPageToken = startPageTokenResponse.data.startPageToken;
-    const driveType = listFilesQueryContext.getDriveType();
-    const driveId = listFilesQueryContext.getDriveId();
     await runtime.db.insert(driveSyncTable).values({
       id: driveId,
       startPageToken,
       driveType
     });
+    logger12.info(`Drive sync initialized with token ${startPageToken}`);
   } else {
     logger12.info("Drive sync already initialized");
   }
+}
+async function setupWatchChannel(runtime, driveClient, queryContext) {
+  const driveId = queryContext.getDriveId();
+  const webhookUrl = `${deployedUrl}/api/gdrive/webhook`;
+  const gdriveChannel = await runtime.db.select().from(gdriveChannelsTable);
+  if (gdriveChannel.length === 0) {
+    await createNewWatchChannel(
+      runtime,
+      driveClient,
+      driveId,
+      webhookUrl,
+      queryContext
+    );
+  } else if (gdriveChannel.length === 1) {
+    await handleSingleChannel(
+      runtime,
+      driveClient,
+      driveId,
+      webhookUrl,
+      queryContext,
+      gdriveChannel[0]
+    );
+  } else if (gdriveChannel.length > 1) {
+    await handleMultipleChannels(
+      runtime,
+      driveClient,
+      driveId,
+      webhookUrl,
+      queryContext,
+      gdriveChannel
+    );
+  }
+}
+async function createNewWatchChannel(runtime, driveClient, driveId, webhookUrl, queryContext) {
+  logger12.info("Creating new watch channel");
+  const watchFolderResponse = await watchFolderChanges(
+    driveId,
+    webhookUrl,
+    driveClient,
+    queryContext.getWatchFolderParams()
+  );
+  await saveWatchChannel(runtime, watchFolderResponse, driveId);
+}
+async function handleSingleChannel(runtime, driveClient, driveId, webhookUrl, queryContext, channel) {
+  logger12.info("Found one channel, checking expiration...");
+  if (channel.expiration < /* @__PURE__ */ new Date()) {
+    try {
+      await stopWatchingChanges(channel.id, channel.resourceId, driveClient);
+    } catch (error) {
+      logger12.error(
+        "Error stopping watching changes, continuing with new channel",
+        error
+      );
+    }
+    await runtime.db.delete(gdriveChannelsTable);
+    await createNewWatchChannel(
+      runtime,
+      driveClient,
+      driveId,
+      webhookUrl,
+      queryContext
+    );
+  } else {
+    logger12.info("Watch channel is still valid, no need to update");
+  }
+}
+async function handleMultipleChannels(runtime, driveClient, driveId, webhookUrl, queryContext, channels) {
+  logger12.info("Multiple watch channels found, cleaning up...");
+  for (const channel of channels) {
+    if (channel.expiration < /* @__PURE__ */ new Date()) {
+      try {
+        await stopWatchingChanges(channel.id, channel.resourceId, driveClient);
+      } catch (error) {
+        logger12.error(
+          "Error stopping watching changes, continuing with next channel",
+          error
+        );
+      }
+    }
+  }
+  await runtime.db.delete(gdriveChannelsTable);
+  await createNewWatchChannel(
+    runtime,
+    driveClient,
+    driveId,
+    webhookUrl,
+    queryContext
+  );
+}
+async function saveWatchChannel(runtime, watchResponse, resourceId) {
+  await runtime.db.insert(gdriveChannelsTable).values({
+    kind: watchResponse.kind,
+    id: watchResponse.id,
+    resourceId,
+    resourceUri: watchResponse.resourceUri,
+    expiration: new Date(parseInt(watchResponse.expiration))
+  });
+  logger12.info(
+    `Saved watch channel ${watchResponse.id}, expires: ${new Date(parseInt(watchResponse.expiration)).toISOString()}`
+  );
 }
 
 // src/routes/gdrive/webhook.ts
