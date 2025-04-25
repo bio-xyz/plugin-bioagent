@@ -1,4 +1,6 @@
 import { z } from "zod";
+// src/types.ts
+export * from "./services/scaich/types"; // 添加 SCAI 类型
 
 export const DKGMemorySchema = z.object({
     "@context": z.literal("http://schema.org"),
