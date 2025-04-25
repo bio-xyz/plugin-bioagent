@@ -74,6 +74,8 @@ mv .env.example .env
 Update your `.env` file with the following variables:
 
 ```env
+PROD_URL=https://your-production-domain.com # for production
+DEV_URL=https://handsome-bubblegum-shepherd.ngrok-free.app # for local development (from ngrok)
 POSTGRES_URL=postgresql://user:password@localhost:5432/dbname
 OPENAI_API_KEY=your_openai_api_key
 ANTHROPIC_API_KEY=your_anthropic_api_key
@@ -98,6 +100,11 @@ BIONTOLOGY_KEY=your_biontology_api_key  # Obtain at https://bioportal.bioontolog
 6. Assign necessary roles (e.g., Editor) and click **Continue**.
 7. Open the newly created service account, go to the **Keys** tab.
 8. Click **Add Key** > **Create new key**, choose **JSON**, and click **Create**. The JSON file will automatically download.
+9. Copy the JSON as it is in the `.env` file in the `GCP_JSON_CREDENTIALS` variable. It should look like this:
+
+```env
+GCP_JSON_CREDENTIALS={"type": "service_account", "project_id": "your_project_id", ...} # Your full GCP service account JSON, in a single line
+```
 
 ### Granting Access to Google Drive Folder
 
@@ -108,3 +115,28 @@ BIONTOLOGY_KEY=your_biontology_api_key  # Obtain at https://bioportal.bioontolog
 5. Set permissions ("Editor" or "Viewer") accordingly and click **Send**.
 
 Your Google Cloud service account now has access to the specified folder. 📁🔑✅
+
+## 🔄 Setting Up Google Drive Webhook (for dropping documents into the folder)
+
+### 1. Configure Webhook URL
+
+1. For local development use [`ngrok`](https://ngrok.com/blog-post/free-static-domains-ngrok-users):
+
+```bash
+ngrok http --domain=handsome-bubblegum-shepherd.ngrok-free.app 3000
+```
+
+Add the ngrok URL to your `.env`:
+
+```env
+DEV_URL=https://handsome-bubblegum-shepherd.ngrok-free.app
+```
+
+2. For production:
+   Add your production domain to `.env`:
+
+```env
+PROD_URL=https://your-production-domain.com
+```
+
+The webhook will automatically use `DEV_URL` in development and `PROD_URL` in production. 🔄📄
