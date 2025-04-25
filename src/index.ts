@@ -12,7 +12,7 @@ export const dkgPlugin: Plugin = {
     logger.info(config);
     setTimeout(async () => {
       await initWithMigrations(runtime);
-    }, 20000); // prevent undefined error, the db property is not available immediately
+    }, 20000); // prevent `undefined` error, the db property is not available immediately
   },
   name: "scaichplugin",
   description: "A plugin for literature search using SCAI API and knowledge graph integration with BioAgent Plugin",

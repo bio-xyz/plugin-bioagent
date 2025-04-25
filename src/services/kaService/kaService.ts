@@ -7,7 +7,7 @@ import { makeUnstructuredApiRequest } from "./unstructuredPartitioning";
 
 import { processJsonArray, process_paper, create_graph } from "./processPaper";
 import { getSummary } from "./vectorize";
-import { fromPath } from "pdf2pic";
+import { fromBuffer, fromPath } from "pdf2pic";
 import fs from "fs";
 import { categorizeIntoDAOsPrompt } from "./llmPrompt";
 import DKG from "dkg.js";
@@ -211,7 +211,7 @@ export interface Image {
 async function extractDOIFromPDF(images: Image[]) {
   const client = getClient();
   const response = await client.messages.create({
-    model: "claude-3-5-haiku-20241022",
+    model: "claude-3-5-haiku-latest",
     messages: [
       {
         role: "user",
@@ -307,6 +307,65 @@ export async function generateKaFromPdf(pdfPath: string, dkgClient: DKGClient) {
     };
   });
   cleanedKa["schema:relatedTo"] = daoUalsMap;
+
+  return cleanedKa;
+}
+
+export async function generateKaFromPdfBuffer(
+  pdfBuffer: Buffer,
+  dkgClient: DKGClient
+) {
+  const options = {
+    density: 100,
+    format: "png",
+    width: 595,
+    height: 842,
+  };
+  const convert = fromBuffer(pdfBuffer, options);
+
+  const storeHandler = await convert.bulk(-1, { responseType: "base64" });
+
+  const imageMessages = storeHandler
+    .filter((page) => page.base64)
+    .map((page) => ({
+      type: "image" as const,
+      source: {
+        type: "base64" as const,
+        media_type: "image/png" as const,
+        data: page.base64!,
+      },
+    }));
+  logger.info(`Extracting DOI`);
+  const doi = await extractDOIFromPDF(imageMessages);
+  if (!doi) {
+    throw new Error("Failed to extract DOI");
+  }
+  const paperArray = await makeUnstructuredApiRequest(
+    pdfBuffer,
+    "paper.pdf",
+    unstructuredApiKey
+  );
+  const ka = await jsonArrToKa(paperArray, doi);
+  const cleanedKa = removeColonsRecursively(ka);
+  const relatedDAOsString = await categorizeIntoDAOs(imageMessages);
+
+  const daos = JSON.parse(relatedDAOsString);
+
+  const daoUalsMap = daos.map((dao) => {
+    const daoUal = daoUals[dao];
+    return {
+      "@id": daoUal,
+      "@type": "schema:Organization",
+      "schema:name": dao,
+    };
+  });
+  cleanedKa["schema:relatedTo"] = daoUalsMap;
+
+  const randomId = Math.random().toString(36).substring(2, 15);
+  fs.writeFileSync(
+    `sampleJsonLdsNew/ka-${randomId}.json`,
+    JSON.stringify(cleanedKa, null, 2)
+  );
 
   return cleanedKa;
 }

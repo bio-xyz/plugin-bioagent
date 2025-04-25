@@ -5,6 +5,7 @@ An Eliza plugin tailored for researchers and bioscientists, converting scientifi
 ## 🚀 How It Works
 
 The BioAgent Plugin continuously monitors a specified Google Drive folder for new scientific documents. Upon detection, it automatically transforms these papers into structured Knowledge Assets and incorporates them into a dynamic knowledge graph. An intelligent agent explores this graph to systematically generate novel biological hypotheses across multiple domains, including genetics, molecular biology, and biotechnology. These hypotheses are then rigorously evaluated and scored by the integrated JudgeLLM according to a precise rubric, ensuring their accuracy and relevance. By default, this cycle of hypothesis generation and evaluation occurs every 90 seconds, but the frequency can be customized. 🔄🤖✨
+![plugin-bioagent-architecture-diagram](https://github.com/user-attachments/assets/54d9a4ff-04e6-4642-8c00-74fa3a88e9ac)
 
 > [!IMPORTANT]
 > This plugin is currently under development and requires additional refinement before production use. Note that the Google Drive webhook functionality only works with publicly accessible URLs. For local development, we're using ngrok to create a temporary public endpoint for the webhook. In future versions, we plan to implement a simpler approach that directly monitors changes to a local folder.
