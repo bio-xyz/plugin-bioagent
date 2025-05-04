@@ -1,1 +1,2 @@
-export * from "./dkgInsert.ts";
+// src/actions/index.ts
+export * from "./scaichSearch";

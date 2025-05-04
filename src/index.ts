@@ -4,6 +4,7 @@ import { dkgInsert } from "./actions/dkgInsert";
 import { HypothesisService } from "./services";
 import { initWithMigrations } from "./helper";
 import { gdriveManualSync, gdriveWebhook, health } from "./routes";
+import { scaichSearch } from "./actions/scaichSearch";
 
 export const dkgPlugin: Plugin = {
   init: async (config: Record<string, string>, runtime: IAgentRuntime) => {
@@ -13,10 +14,9 @@ export const dkgPlugin: Plugin = {
       await initWithMigrations(runtime);
     }, 20000); // prevent `undefined` error, the db property is not available immediately
   },
-  name: "dkg",
-  description:
-    "Agent DKG which allows you to store memories on the OriginTrail Decentralized Knowledge Graph",
-  actions: [dkgInsert],
+  name: "scaichplugin",
+  description: "A plugin for literature search using SCAI API and knowledge graph integration with BioAgent Plugin",
+  actions: [dkgInsert, scaichSearch],
   providers: [],
   evaluators: [],
   services: [HypothesisService],
